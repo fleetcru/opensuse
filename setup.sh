@@ -14,6 +14,7 @@ log() {
 zypper_auto() {
     sudo zypper \
         --non-interactive \
+        --gpg-auto-import-keys \
         "$@"
 }
 
@@ -212,22 +213,60 @@ install_system_dev_packages() {
 }
 
 install_firefox_mozilla() {
-    log "Installing Firefox from the Mozilla repository"
+    local mozilla_repository_url="https://packages.mozilla.org/rpm/firefox"
+    local mozilla_old_key="gpg-pubkey-14f26682d0916cdd81e37b6d61b7b526d98f0353"
+    local firefox_search_output
 
+    log "Configuring the Mozilla Firefox repository"
+
+    if sudo zypper lr -u | grep -Eq '[|][[:space:]]*mozilla[[:space:]]*[|]'; then
+        log "Removing the existing Mozilla repository"
+        zypper_auto rr mozilla
+    fi
+
+    log "Removing stale Mozilla repository metadata"
+    sudo rm -rf -- \
+        /var/cache/zypp/solv/mozilla \
+        /var/cache/zypp/raw/mozilla
+
+    if rpm -q "$mozilla_old_key" >/dev/null 2>&1; then
+        log "Removing Mozilla's revoked RPM key"
+        sudo rpm -e "$mozilla_old_key"
+    fi
+
+    log "Importing the current official Mozilla signing key"
     sudo rpm --import \
         https://packages.mozilla.org/rpm/firefox/signing-key.gpg
 
-    if ! sudo zypper lr -u | grep -Fq 'https://packages.mozilla.org/rpm/firefox'; then
-        sudo zypper --non-interactive ar \
-            --gpgcheck-allow-unsigned-repo \
-            -p 10 \
-            https://packages.mozilla.org/rpm/firefox \
-            mozilla
+    log "Adding the official Mozilla repository"
+    zypper_auto ar \
+        --priority 10 \
+        "$mozilla_repository_url" \
+        mozilla
+
+    log "Refreshing only the Mozilla repository"
+    if ! zypper_auto refresh mozilla; then
+        echo "Error: Mozilla repository refresh failed; Firefox installation cannot continue." >&2
+        exit 1
     fi
 
-    zypper_auto refresh
-    zypper_auto remove firefox
-    zypper_auto install firefox
+    log "Checking whether Mozilla provides the firefox package"
+    if firefox_search_output="$(zypper_auto se --repo mozilla --match-exact firefox 2>&1)"; then
+        if grep -Eq '(^|[[:space:]])firefox([[:space:]]|$)' <<< "$firefox_search_output"; then
+            log "Installing Firefox explicitly from the Mozilla repository"
+            zypper_auto install --from mozilla firefox
+            return
+        fi
+    fi
+
+    log "Mozilla does not provide firefox; using openSUSE's MozillaFirefox package"
+    if [[ -n "$firefox_search_output" ]]; then
+        echo "Mozilla package lookup result:"
+        echo "$firefox_search_output"
+    else
+        echo "Reason: the Mozilla package lookup failed or returned no matching package."
+    fi
+    zypper_auto install MozillaFirefox
 }
 
 install_go() (
