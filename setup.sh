@@ -14,7 +14,7 @@ log() {
 zypper_auto() {
     sudo zypper \
         --non-interactive \
-        --auto-agree-with-licenses \
+        --no-confirm \
         "$@"
 }
 
