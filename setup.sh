@@ -12,10 +12,7 @@ log() {
 }
 
 zypper_auto() {
-    sudo zypper \
-        --non-interactive \
-        --no-confirm \
-        "$@"
+    sudo zypper --non-interactive "$@" --no-confirm
 }
 
 check_requirements() {
