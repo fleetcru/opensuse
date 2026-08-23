@@ -67,7 +67,7 @@ replace_minimal_build_packages() {
         rpm -q busybox-diffutils
 
         echo
-        echo "Removing busybox-diffutils so the complete GNU tools can be used..."
+        echo "Removing busybox-diffutils..."
 
         sudo zypper remove busybox-diffutils
     else
@@ -117,8 +117,6 @@ install_system_dev_packages() {
         cmake \
         ninja \
         pkg-config
-
-    replace_minimal_build_packages
 
     log "Installing the openSUSE development pattern"
 
@@ -261,56 +259,6 @@ install_node_stack() (
     echo "pnpm: $(pnpm --version)"
 )
 
-install_sdkman_and_java() (
-    set -Eeo pipefail
-
-    log "Installing SDKMAN"
-
-    curl \
-        --proto '=https' \
-        --tlsv1.2 \
-        --fail \
-        --silent \
-        --show-error \
-        --location \
-        https://get.sdkman.io |
-        bash
-
-    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
-        echo "Error: SDKMAN installation failed." >&2
-        exit 1
-    fi
-
-    set +u
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    set -u
-
-    log "Installing Eclipse Temurin JDK $JAVA_VERSION"
-
-    sdk install java "$JAVA_VERSION"
-    sdk default java "$JAVA_VERSION"
-    sdk use java "$JAVA_VERSION"
-
-    echo
-    sdk version
-    java --version
-    javac --version
-    echo "JAVA_HOME=$JAVA_HOME"
-)
-
-load_sdkman_java() {
-    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
-        echo "Error: SDKMAN initialization file was not found." >&2
-        exit 1
-    fi
-
-    set +u
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    set -u
-
-    sdk use java "$JAVA_VERSION" >/dev/null
-}
-
 install_rust() (
     set -Eeo pipefail
 
@@ -387,6 +335,56 @@ install_uv_and_python() (
     uv --version
     uv python list
 )
+
+install_sdkman_and_java() (
+    set -Eeo pipefail
+
+    log "Installing SDKMAN"
+
+    curl \
+        --proto '=https' \
+        --tlsv1.2 \
+        --fail \
+        --silent \
+        --show-error \
+        --location \
+        https://get.sdkman.io |
+        bash
+
+    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
+        echo "Error: SDKMAN installation failed." >&2
+        exit 1
+    fi
+
+    set +u
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    set -u
+
+    log "Installing Eclipse Temurin JDK $JAVA_VERSION"
+
+    sdk install java "$JAVA_VERSION"
+    sdk default java "$JAVA_VERSION"
+    sdk use java "$JAVA_VERSION"
+
+    echo
+    sdk version
+    java --version
+    javac --version
+    echo "JAVA_HOME=$JAVA_HOME"
+)
+
+load_sdkman_java() {
+    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
+        echo "Error: SDKMAN initialization file was not found." >&2
+        exit 1
+    fi
+
+    set +u
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    set -u
+
+    sdk use java "$JAVA_VERSION" >/dev/null
+}
 
 install_android_studio() (
     set -Eeuo pipefail
@@ -465,6 +463,9 @@ install_flutter() (
 
     cleanup_flutter() {
         rm -rf -- "$flutter_temp_dir"
+    }
+
+flutter_temp_dir"
     }
 
     trap cleanup_flutter EXIT
@@ -622,6 +623,10 @@ main() {
     sudo -v
 
     update_opensuse
+
+    # This explicitly checks for and replaces the minimal BusyBox utilities.
+    replace_minimal_build_packages
+
     install_system_dev_packages
 
     install_go
