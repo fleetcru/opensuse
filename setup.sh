@@ -11,6 +11,13 @@ log() {
     printf '\n==> %s\n' "$1"
 }
 
+zypper_auto() {
+    sudo zypper \
+        --non-interactive \
+        --auto-agree-with-licenses \
+        "$@"
+}
+
 check_requirements() {
     local required_commands=(
         curl
@@ -49,11 +56,11 @@ check_requirements() {
 update_opensuse() {
     log "Updating openSUSE"
 
-    sudo zypper dup
+    zypper_auto dup
 
     log "Installing the Plasma 6 X11 session"
 
-    sudo zypper install plasma6-session-x11
+    zypper_auto install plasma6-session-x11
 }
 
 replace_minimal_build_packages() {
@@ -62,7 +69,7 @@ replace_minimal_build_packages() {
     if rpm -q busybox-diffutils >/dev/null 2>&1; then
         log "Minimal-image BusyBox diff utilities detected"
         rpm -q busybox-diffutils
-        sudo zypper remove busybox-diffutils
+        zypper_auto remove busybox-diffutils
     else
         log "busybox-diffutils is not installed; no removal needed"
     fi
@@ -77,7 +84,7 @@ replace_minimal_build_packages() {
 
     if ((${#packages_to_install[@]} > 0)); then
         log "Installing complete GNU build utilities"
-        sudo zypper install "${packages_to_install[@]}"
+        zypper_auto install "${packages_to_install[@]}"
     else
         log "GNU diffutils and gettext-tools are already installed"
     fi
@@ -157,7 +164,7 @@ install_android_studio() (
 install_system_dev_packages() {
     log "Installing Git, terminal utilities, and build tools"
 
-    sudo zypper install \
+    zypper_auto install \
         git \
         git-lfs \
         gh \
@@ -183,18 +190,18 @@ install_system_dev_packages() {
 
     log "Installing the openSUSE development pattern"
 
-    sudo zypper install -t pattern devel_basis
+    zypper_auto install -t pattern devel_basis
 
     log "Installing required Flutter Linux dependencies"
 
-    sudo zypper install \
+    zypper_auto install \
         clang \
         gtk3-devel \
         libGLU1
 
     log "Installing Tauri system dependencies"
 
-    sudo zypper install \
+    zypper_auto install \
         webkitgtk3-devel \
         libopenssl-devel \
         libappindicator3-1 \
