@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 readonly GO_VERSION="go1.27.0"
-readonly NVM_VERSION="v0.40.7"
+readonly NVM_INSTALL_RELEASE="v0.40.7"
 readonly NODE_VERSION="24"
 readonly PNPM_VERSION="11.22.0"
 
@@ -181,7 +181,7 @@ install_system_dev_packages() {
     log "Installing Tauri system dependencies"
 
     sudo zypper install \
-        'pkgconfig(webkit2gtk-4.1)' \
+        webkitgtk3-devel \
         libopenssl-devel \
         libappindicator3-1 \
         librsvg-devel
@@ -259,7 +259,7 @@ install_node_stack() (
 
     export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
 
-    log "Installing NVM $NVM_VERSION"
+    log "Installing NVM $NVM_INSTALL_RELEASE"
 
     curl \
         --proto '=https' \
@@ -268,7 +268,7 @@ install_node_stack() (
         --silent \
         --show-error \
         --location \
-        "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" |
+        "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_INSTALL_RELEASE}/install.sh" |
         bash
 
     set +u
