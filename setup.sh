@@ -12,8 +12,10 @@ log() {
 }
 
 zypper_auto() {
+    # Ensure global options are upfront, and subcommand confirmations are appended safely
     sudo zypper --non-interactive --gpg-auto-import-keys "$@" --no-confirm --auto-agree-with-licenses
 }
+
 
 
 check_requirements() {
