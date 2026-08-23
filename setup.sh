@@ -17,6 +17,7 @@ check_requirements() {
         curl
         grep
         mktemp
+        rpm
         sed
         sha256sum
         sudo
@@ -56,6 +57,40 @@ update_opensuse() {
     sudo zypper install plasma6-session-x11
 }
 
+replace_minimal_build_packages() {
+    local packages_to_install=()
+
+    if rpm -q busybox-diffutils >/dev/null 2>&1; then
+        log "Minimal-image BusyBox diff utilities detected"
+
+        echo "Installed package:"
+        rpm -q busybox-diffutils
+
+        echo
+        echo "Removing busybox-diffutils so the complete GNU tools can be used..."
+
+        sudo zypper remove busybox-diffutils
+    else
+        log "busybox-diffutils is not installed; no removal needed"
+    fi
+
+    if ! rpm -q diffutils >/dev/null 2>&1; then
+        packages_to_install+=(diffutils)
+    fi
+
+    if ! rpm -q gettext-tools >/dev/null 2>&1; then
+        packages_to_install+=(gettext-tools)
+    fi
+
+    if ((${#packages_to_install[@]} > 0)); then
+        log "Installing complete GNU build utilities"
+
+        sudo zypper install "${packages_to_install[@]}"
+    else
+        log "GNU diffutils and gettext-tools are already installed"
+    fi
+}
+
 install_system_dev_packages() {
     log "Installing Git, terminal utilities, and build tools"
 
@@ -83,6 +118,8 @@ install_system_dev_packages() {
         ninja \
         pkg-config
 
+    replace_minimal_build_packages
+
     log "Installing the openSUSE development pattern"
 
     sudo zypper install -t pattern devel_basis
@@ -91,12 +128,13 @@ install_system_dev_packages() {
 
     sudo zypper install \
         clang \
+        gtk3-devel \
         libGLU1
 
-    log "Installing Tauri system dependencies"
+    log "Installing Tauri dependencies"
 
     sudo zypper install \
-        webkit2gtk3-devel \
+        'pkgconfig(webkit2gtk-4.1)' \
         libopenssl-devel \
         libappindicator3-1 \
         librsvg-devel
@@ -469,7 +507,6 @@ install_flutter() (
         echo "Flutter $FLUTTER_VERSION is already installed."
     fi
 
-    # Preserve an existing non-symlink Flutter installation.
     if [[ -e "$flutter_link" && ! -L "$flutter_link" ]]; then
         local flutter_backup
         flutter_backup="${flutter_link}.backup.$(date +%Y%m%d-%H%M%S)"
@@ -548,6 +585,10 @@ show_versions() {
     printf '%-10s %s\n' "GCC:"     "$(gcc --version | sed -n '1p')"
     printf '%-10s %s\n' "Clang:"   "$(clang --version | sed -n '1p')"
     printf '%-10s %s\n' "CMake:"   "$(cmake --version | sed -n '1p')"
+
+    echo
+    echo "WebKitGTK:"
+    pkg-config --modversion webkit2gtk-4.1
 
     echo
     echo "Managed Python installations:"
