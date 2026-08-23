@@ -93,8 +93,21 @@ install_android_studio() (
 
     local studio_temp_dir
     local studio_archive
+    local studio_staging_root="$HOME/.cache/setup-dev"
+    local studio_available_kb
 
-    studio_temp_dir="$(mktemp -d)"
+    mkdir -p "$studio_staging_root"
+
+    studio_available_kb="$(df -Pk "$HOME" | awk 'NR == 2 { print $4 }')"
+
+    if [[ ! "$studio_available_kb" =~ ^[0-9]+$ ]] || (( studio_available_kb < 4000000 )); then
+        echo "Error: at least 4 GB of free disk space is required for Android Studio." >&2
+        df -h "$HOME" >&2
+        exit 1
+    fi
+
+    # Use the home filesystem instead of /tmp, which may be a small tmpfs.
+    studio_temp_dir="$(mktemp -d "${studio_staging_root}/android-studio.XXXXXX")"
     studio_archive="${studio_temp_dir}/${studio_file}"
 
     cleanup_android_studio() {
