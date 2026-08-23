@@ -14,11 +14,8 @@ log() {
 zypper_auto() {
     sudo zypper \
         --non-interactive \
-        --gpg-auto-import-keys \
         "$@"
 }
-
-
 
 check_requirements() {
     local required_commands=(
@@ -212,6 +209,25 @@ install_system_dev_packages() {
     log "Configuring Git LFS"
 
     git lfs install
+}
+
+install_firefox_mozilla() {
+    log "Installing Firefox from the Mozilla repository"
+
+    sudo rpm --import \
+        https://packages.mozilla.org/rpm/firefox/signing-key.gpg
+
+    if ! sudo zypper lr -u | grep -Fq 'https://packages.mozilla.org/rpm/firefox'; then
+        sudo zypper --non-interactive ar \
+            --gpgcheck-allow-unsigned-repo \
+            -p 10 \
+            https://packages.mozilla.org/rpm/firefox \
+            mozilla
+    fi
+
+    zypper_auto refresh
+    zypper_auto remove firefox
+    zypper_auto install firefox
 }
 
 install_go() (
@@ -433,7 +449,8 @@ install_flutter() (
     local flutter_archive
     local path_line
 
-    flutter_temp_dir="$(mktemp -d)"
+    flutter_temp_dir="/var/tmp/setup-dev/flutter-${BASHPID}"
+    mkdir -p "$flutter_temp_dir"
     flutter_archive="${flutter_temp_dir}/${flutter_file}"
 
     cleanup_flutter() {
@@ -640,6 +657,8 @@ main() {
     replace_minimal_build_packages
 
     install_system_dev_packages
+
+    install_firefox_mozilla
 
     install_go
     export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
