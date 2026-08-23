@@ -1,0 +1,49 @@
+#cloud-config
+#
+# Fleetcru openSUSE setup runner.
+#
+# Paste this file into the DigitalOcean droplet User Data / cloud-init field.
+# It intentionally runs setup.sh as root, as requested.
+
+package_update: true
+
+packages:
+  - curl
+  - sudo
+
+write_files:
+  - path: /usr/local/sbin/fleetcru-run-setup
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
+
+      readonly SETUP_URL="https://suse.fleetcru.dev/setup.sh?refresh=$(date +%s)"
+      readonly SETUP_SCRIPT="/var/tmp/fleetcru-setup.sh"
+      readonly LOG_FILE="/var/log/fleetcru-setup.log"
+
+      exec > >(tee -a "$LOG_FILE") 2>&1
+
+      echo "Starting Fleetcru openSUSE setup: $(date --iso-8601=seconds)"
+
+      curl \
+          --proto '=https' \
+          --tlsv1.2 \
+          --fail \
+          --show-error \
+          --location \
+          --retry 3 \
+          --retry-delay 2 \
+          --output "$SETUP_SCRIPT" \
+          "$SETUP_URL"
+
+      chmod 0755 "$SETUP_SCRIPT"
+
+      # Answer the setup script's optional reboot prompt with "No".
+      printf 'N\\n' | bash "$SETUP_SCRIPT"
+
+      echo "Fleetcru openSUSE setup finished: $(date --iso-8601=seconds)"
+
+runcmd:
+  - [bash, -lc, "/usr/local/sbin/fleetcru-run-setup"]
