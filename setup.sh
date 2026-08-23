@@ -5,6 +5,7 @@ readonly GO_VERSION="go1.27.0"
 readonly NVM_INSTALL_RELEASE="v0.40.7"
 readonly NODE_VERSION="24"
 readonly PNPM_VERSION="11.22.0"
+readonly SDKMAN_JAVA_VERSION="17.0.20-tem"
 
 log() {
     printf '\n==> %s\n' "$1"
@@ -311,19 +312,23 @@ install_node_stack() (
 install_sdkman_and_java() (
     set -Eeo pipefail
 
-    local java_version="17.0.20-tem"
+    local java_version="$SDKMAN_JAVA_VERSION"
 
-    log "Installing SDKMAN"
+    if [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
+        log "SDKMAN is already installed"
+    else
+        log "Installing SDKMAN"
 
-    curl \
-        --proto '=https' \
-        --tlsv1.2 \
-        --fail \
-        --silent \
-        --show-error \
-        --location \
-        https://get.sdkman.io |
-        bash
+        curl \
+            --proto '=https' \
+            --tlsv1.2 \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            https://get.sdkman.io |
+            bash
+    fi
 
     if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
         echo "Error: SDKMAN installation failed." >&2
@@ -332,11 +337,14 @@ install_sdkman_and_java() (
 
     set +u
     source "$HOME/.sdkman/bin/sdkman-init.sh"
-    set -u
 
     log "Installing Eclipse Temurin JDK $java_version"
 
-    sdk install java "$java_version"
+    if sdk home java "$java_version" >/dev/null 2>&1; then
+        echo "JDK $java_version is already installed."
+    else
+        sdk install java "$java_version"
+    fi
     sdk default java "$java_version"
     sdk use java "$java_version"
 
@@ -345,7 +353,15 @@ install_sdkman_and_java() (
     java --version
     javac --version
     echo "JAVA_HOME=$JAVA_HOME"
+    set -u
 )
+
+load_sdkman_java() {
+    set +u
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk use java "$SDKMAN_JAVA_VERSION" >/dev/null
+    set -u
+}
 
 install_rust() (
     set -Eeo pipefail
@@ -540,9 +556,8 @@ show_versions() {
     if [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
         set +u
         source "$HOME/.sdkman/bin/sdkman-init.sh"
+        sdk use java "$SDKMAN_JAVA_VERSION" >/dev/null
         set -u
-
-        sdk use java 17.0.20-tem >/dev/null
     fi
 
     log "Installed development tools"
@@ -616,6 +631,7 @@ main() {
     export PATH="$HOME/.local/bin:$PATH"
 
     install_sdkman_and_java
+    load_sdkman_java
 
     install_android_studio
 
