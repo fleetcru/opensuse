@@ -12,8 +12,9 @@ log() {
 }
 
 zypper_auto() {
-    sudo zypper --non-interactive "$@" --no-confirm
+    sudo zypper --non-interactive --gpg-auto-import-keys "$@" --no-confirm --auto-agree-with-licenses
 }
+
 
 check_requirements() {
     local required_commands=(
