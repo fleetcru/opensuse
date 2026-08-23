@@ -12,9 +12,10 @@ log() {
 }
 
 zypper_auto() {
-    # --non-interactive goes BEFORE your subcommand ($@)
-    # --no-confirm and --auto-agree-with-licenses MUST go AFTER your package list ($@)
-    sudo zypper --non-interactive "$@" --no-confirm --auto-agree-with-licenses
+    # 1. Global options go BEFORE "$@"
+    # 2. "$@" accepts your subcommand (install, dup, etc.) and package names
+    # 3. Subcommand options go AFTER "$@" to evaluate safely at the very end
+    sudo zypper --non-interactive --gpg-auto-import-keys "$@" --no-confirm --auto-agree-with-licenses
 }
 
 
