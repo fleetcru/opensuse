@@ -653,7 +653,9 @@ check_flutter_android_toolchain() {
     fi
 
     log "Checking the Flutter Android toolchain"
-    flutter doctor
+    if ! flutter doctor; then
+        echo "Warning: Flutter Android toolchain checks reported issues; continuing setup." >&2
+    fi
 }
 
 show_versions() {
