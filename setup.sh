@@ -627,37 +627,6 @@ install_uv_and_python() (
     uv python list
 )
 
-check_flutter_android_toolchain() {
-    local android_sdk=""
-    local candidate
-
-    for candidate in \
-        "${ANDROID_HOME:-}" \
-        "${ANDROID_SDK_ROOT:-}" \
-        "$HOME/Android/Sdk" \
-        "/opt/android-sdk"; do
-        if [[ -n "$candidate" && -d "$candidate/platform-tools" ]]; then
-            android_sdk="$candidate"
-            break
-        fi
-    done
-
-    if [[ -n "$android_sdk" ]]; then
-        export ANDROID_HOME="$android_sdk"
-        export ANDROID_SDK_ROOT="$android_sdk"
-
-        log "Configuring Flutter to use Android SDK: $android_sdk"
-        flutter config --android-sdk "$android_sdk"
-    else
-        log "Android SDK not found; Flutter doctor will report the required setup steps"
-    fi
-
-    log "Checking the Flutter Android toolchain"
-    if ! flutter doctor; then
-        echo "Warning: Flutter Android toolchain checks reported issues; continuing setup." >&2
-    fi
-}
-
 show_versions() {
     export PATH="$HOME/develop/flutter/bin:/usr/local/go/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
     export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
@@ -757,8 +726,6 @@ main() {
     install_flutter
     export PATH="$HOME/develop/flutter/bin:$PATH"
 
-    check_flutter_android_toolchain
-
     show_versions
 
     echo
@@ -767,6 +734,11 @@ main() {
     echo "GitHub authentication was not automated."
     echo "After reboot, authenticate manually with:"
     echo "  gh auth login"
+    echo
+    echo "After Android Studio finishes installing the Android SDK, configure Flutter with:"
+    echo "  flutter config --android-sdk \"\$HOME/Android/Sdk\""
+    echo "  flutter doctor --android-licenses"
+    echo "  flutter doctor"
     echo
 
     ask_to_reboot
