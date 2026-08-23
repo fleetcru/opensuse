@@ -14,7 +14,6 @@ log() {
 zypper_auto() {
     sudo zypper \
         --non-interactive \
-        --gpg-auto-import-keys \
         "$@"
 }
 
