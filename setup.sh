@@ -563,6 +563,13 @@ install_flutter() (
 
     export PATH="$HOME/develop/flutter/bin:$PATH"
 
+    log "Registering Flutter as a trusted Git working tree"
+
+    if ! git config --global --get-all safe.directory 2>/dev/null |
+        grep -Fqx "$flutter_install"; then
+        git config --global --add safe.directory "$flutter_install"
+    fi
+
     log "Enabling Flutter targets"
 
     flutter config \
