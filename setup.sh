@@ -171,6 +171,7 @@ install_system_dev_packages() {
         curl \
         wget \
         file \
+        which \
         unzip \
         zip \
         xz \
