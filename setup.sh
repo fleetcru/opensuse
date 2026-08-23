@@ -5,8 +5,6 @@ readonly GO_VERSION="go1.27.0"
 readonly NVM_VERSION="v0.40.7"
 readonly NODE_VERSION="24"
 readonly PNPM_VERSION="11.22.0"
-readonly JAVA_VERSION="17.0.20-tem"
-readonly FLUTTER_VERSION="3.47.1"
 
 log() {
     printf '\n==> %s\n' "$1"
@@ -62,13 +60,7 @@ replace_minimal_build_packages() {
 
     if rpm -q busybox-diffutils >/dev/null 2>&1; then
         log "Minimal-image BusyBox diff utilities detected"
-
-        echo "Installed package:"
         rpm -q busybox-diffutils
-
-        echo
-        echo "Removing busybox-diffutils..."
-
         sudo zypper remove busybox-diffutils
     else
         log "busybox-diffutils is not installed; no removal needed"
@@ -84,12 +76,69 @@ replace_minimal_build_packages() {
 
     if ((${#packages_to_install[@]} > 0)); then
         log "Installing complete GNU build utilities"
-
         sudo zypper install "${packages_to_install[@]}"
     else
         log "GNU diffutils and gettext-tools are already installed"
     fi
 }
+
+install_android_studio() (
+    set -Eeuo pipefail
+
+    local studio_version="2026.1.3.8"
+    local studio_file="android-studio-quail3-patch1-linux.tar.gz"
+    local studio_url="https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.1.3.8/android-studio-quail3-patch1-linux.tar.gz"
+    local studio_sha256="5bd5ee5d6e747b13f82fba3241380bd358cc2f4a847815c8e860757df13dc35f"
+
+    local studio_temp_dir
+    local studio_archive
+
+    studio_temp_dir="$(mktemp -d)"
+    studio_archive="${studio_temp_dir}/${studio_file}"
+
+    cleanup_android_studio() {
+        rm -rf -- "$studio_temp_dir"
+    }
+
+    trap cleanup_android_studio EXIT
+
+    log "Downloading Android Studio $studio_version"
+
+    curl \
+        --proto '=https' \
+        --tlsv1.2 \
+        --fail \
+        --show-error \
+        --location \
+        --retry 3 \
+        --retry-delay 2 \
+        --output "$studio_archive" \
+        "$studio_url"
+
+    log "Verifying Android Studio SHA-256 checksum"
+
+    printf '%s  %s\n' "$studio_sha256" "$studio_archive" |
+        sha256sum --check -
+
+    log "Installing Android Studio into /opt/android-studio"
+
+    sudo rm -rf -- /opt/android-studio
+    sudo tar -C /opt -xzf "$studio_archive"
+
+    if [[ ! -x /opt/android-studio/bin/studio.sh ]]; then
+        echo "Error: Android Studio installation failed." >&2
+        exit 1
+    fi
+
+    sudo ln -sfn \
+        /opt/android-studio/bin/studio.sh \
+        /usr/local/bin/android-studio
+
+    echo
+    echo "Android Studio installed successfully."
+    echo "Start it after reboot with:"
+    echo "  android-studio"
+)
 
 install_system_dev_packages() {
     log "Installing Git, terminal utilities, and build tools"
@@ -129,7 +178,7 @@ install_system_dev_packages() {
         gtk3-devel \
         libGLU1
 
-    log "Installing Tauri dependencies"
+    log "Installing Tauri system dependencies"
 
     sudo zypper install \
         'pkgconfig(webkit2gtk-4.1)' \
@@ -259,6 +308,45 @@ install_node_stack() (
     echo "pnpm: $(pnpm --version)"
 )
 
+install_sdkman_and_java() (
+    set -Eeo pipefail
+
+    local java_version="17.0.20-tem"
+
+    log "Installing SDKMAN"
+
+    curl \
+        --proto '=https' \
+        --tlsv1.2 \
+        --fail \
+        --silent \
+        --show-error \
+        --location \
+        https://get.sdkman.io |
+        bash
+
+    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
+        echo "Error: SDKMAN installation failed." >&2
+        exit 1
+    fi
+
+    set +u
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    set -u
+
+    log "Installing Eclipse Temurin JDK $java_version"
+
+    sdk install java "$java_version"
+    sdk default java "$java_version"
+    sdk use java "$java_version"
+
+    echo
+    sdk version
+    java --version
+    javac --version
+    echo "JAVA_HOME=$JAVA_HOME"
+)
+
 install_rust() (
     set -Eeo pipefail
 
@@ -290,6 +378,107 @@ install_rust() (
     echo "Rustup: $(rustup --version)"
     echo "Rust:   $(rustc --version)"
     echo "Cargo:  $(cargo --version)"
+)
+
+install_flutter() (
+    set -Eeuo pipefail
+
+    local flutter_version="3.47.1"
+    local flutter_file="flutter_linux_3.47.1-stable.tar.xz"
+    local flutter_url="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.1-stable.tar.xz"
+    local flutter_sha256="a1d8166c0309267cb7dc99f1424eecf08b86946ad3b50723c6f59945964aea45"
+
+    local flutter_base="$HOME/develop"
+    local flutter_install="${flutter_base}/flutter-${flutter_version}"
+    local flutter_link="${flutter_base}/flutter"
+    local flutter_temp_dir
+    local flutter_archive
+    local path_line
+
+    flutter_temp_dir="$(mktemp -d)"
+    flutter_archive="${flutter_temp_dir}/${flutter_file}"
+
+    cleanup_flutter() {
+        rm -rf -- "$flutter_temp_dir"
+    }
+
+    trap cleanup_flutter EXIT
+
+    log "Downloading Flutter $flutter_version"
+
+    curl \
+        --proto '=https' \
+        --tlsv1.2 \
+        --fail \
+        --show-error \
+        --location \
+        --retry 3 \
+        --retry-delay 2 \
+        --output "$flutter_archive" \
+        "$flutter_url"
+
+    log "Verifying the Flutter SHA-256 checksum"
+
+    printf '%s  %s\n' "$flutter_sha256" "$flutter_archive" |
+        sha256sum --check -
+
+    log "Extracting Flutter"
+
+    mkdir -p "$flutter_base"
+    mkdir -p "$flutter_temp_dir/extracted"
+
+    tar \
+        -xJf "$flutter_archive" \
+        -C "$flutter_temp_dir/extracted"
+
+    if [[ ! -x "$flutter_temp_dir/extracted/flutter/bin/flutter" ]]; then
+        echo "Error: Flutter archive is invalid." >&2
+        exit 1
+    fi
+
+    if [[ ! -d "$flutter_install" ]]; then
+        mv "$flutter_temp_dir/extracted/flutter" "$flutter_install"
+    else
+        echo "Flutter $flutter_version is already installed."
+    fi
+
+    # Preserve an existing non-symlink Flutter installation.
+    if [[ -e "$flutter_link" && ! -L "$flutter_link" ]]; then
+        local flutter_backup
+        flutter_backup="${flutter_link}.backup.$(date +%Y%m%d-%H%M%S)"
+
+        echo "Moving the existing Flutter installation to:"
+        echo "  $flutter_backup"
+
+        mv "$flutter_link" "$flutter_backup"
+    fi
+
+    ln -sfn "$flutter_install" "$flutter_link"
+
+    path_line='export PATH="$HOME/develop/flutter/bin:$PATH"'
+
+    touch "$HOME/.bashrc"
+
+    if ! grep -Fqx "$path_line" "$HOME/.bashrc"; then
+        {
+            printf '\n'
+            printf '# Flutter SDK\n'
+            printf '%s\n' "$path_line"
+        } >> "$HOME/.bashrc"
+    fi
+
+    export PATH="$HOME/develop/flutter/bin:$PATH"
+
+    log "Enabling Flutter targets"
+
+    flutter config \
+        --enable-android \
+        --enable-web \
+        --enable-linux-desktop
+
+    echo
+    flutter --version
+    dart --version
 )
 
 install_uv_and_python() (
@@ -336,216 +525,6 @@ install_uv_and_python() (
     uv python list
 )
 
-install_sdkman_and_java() (
-    set -Eeo pipefail
-
-    log "Installing SDKMAN"
-
-    curl \
-        --proto '=https' \
-        --tlsv1.2 \
-        --fail \
-        --silent \
-        --show-error \
-        --location \
-        https://get.sdkman.io |
-        bash
-
-    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
-        echo "Error: SDKMAN installation failed." >&2
-        exit 1
-    fi
-
-    set +u
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    set -u
-
-    log "Installing Eclipse Temurin JDK $JAVA_VERSION"
-
-    sdk install java "$JAVA_VERSION"
-    sdk default java "$JAVA_VERSION"
-    sdk use java "$JAVA_VERSION"
-
-    echo
-    sdk version
-    java --version
-    javac --version
-    echo "JAVA_HOME=$JAVA_HOME"
-)
-
-load_sdkman_java() {
-    if [[ ! -s "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
-        echo "Error: SDKMAN initialization file was not found." >&2
-        exit 1
-    fi
-
-    set +u
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    set -u
-
-    sdk use java "$JAVA_VERSION" >/dev/null
-}
-
-install_android_studio() (
-    set -Eeuo pipefail
-
-    local studio_version="2026.1.3.8"
-    local studio_file="android-studio-quail3-patch1-linux.tar.gz"
-    local studio_url="https://edgedl.me.gvt1.com/android/studio/ide-zips/2026.1.3.8/android-studio-quail3-patch1-linux.tar.gz"
-    local studio_sha256="5bd5ee5d6e747b13f82fba3241380bd358cc2f4a847815c8e860757df13dc35f"
-
-    local studio_temp_dir
-    local studio_archive
-
-    studio_temp_dir="$(mktemp -d)"
-    studio_archive="${studio_temp_dir}/${studio_file}"
-
-    cleanup_android_studio() {
-        rm -rf -- "$studio_temp_dir"
-    }
-
-    trap cleanup_android_studio EXIT
-
-    log "Downloading Android Studio $studio_version"
-
-    curl \
-        --proto '=https' \
-        --tlsv1.2 \
-        --fail \
-        --show-error \
-        --location \
-        --retry 3 \
-        --retry-delay 2 \
-        --output "$studio_archive" \
-        "$studio_url"
-
-    log "Verifying the Android Studio SHA-256 checksum"
-
-    printf '%s  %s\n' "$studio_sha256" "$studio_archive" |
-        sha256sum --check -
-
-    log "Installing Android Studio into /opt/android-studio"
-
-    sudo rm -rf -- /opt/android-studio
-    sudo tar -C /opt -xzf "$studio_archive"
-
-    if [[ ! -x /opt/android-studio/bin/studio.sh ]]; then
-        echo "Error: Android Studio installation failed." >&2
-        exit 1
-    fi
-
-    sudo ln -sfn \
-        /opt/android-studio/bin/studio.sh \
-        /usr/local/bin/android-studio
-
-    echo
-    echo "Android Studio installed successfully."
-    echo "Start it after reboot with:"
-    echo "  android-studio"
-)
-
-install_flutter() (
-    set -Eeuo pipefail
-
-    local flutter_file="flutter_linux_3.47.1-stable.tar.xz"
-    local flutter_url="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.47.1-stable.tar.xz"
-    local flutter_sha256="a1d8166c0309267cb7dc99f1424eecf08b86946ad3b50723c6f59945964aea45"
-
-    local flutter_base="$HOME/develop"
-    local flutter_install="${flutter_base}/flutter-${FLUTTER_VERSION}"
-    local flutter_link="${flutter_base}/flutter"
-    local flutter_temp_dir
-    local flutter_archive
-    local path_line
-
-    flutter_temp_dir="$(mktemp -d)"
-    flutter_archive="${flutter_temp_dir}/${flutter_file}"
-
-    cleanup_flutter() {
-        rm -rf -- "$flutter_temp_dir"
-    }
-
-flutter_temp_dir"
-    }
-
-    trap cleanup_flutter EXIT
-
-    log "Downloading Flutter $FLUTTER_VERSION"
-
-    curl \
-        --proto '=https' \
-        --tlsv1.2 \
-        --fail \
-        --show-error \
-        --location \
-        --retry 3 \
-        --retry-delay 2 \
-        --output "$flutter_archive" \
-        "$flutter_url"
-
-    log "Verifying the Flutter SHA-256 checksum"
-
-    printf '%s  %s\n' "$flutter_sha256" "$flutter_archive" |
-        sha256sum --check -
-
-    log "Extracting Flutter"
-
-    mkdir -p "$flutter_base"
-    mkdir -p "$flutter_temp_dir/extracted"
-
-    tar \
-        -xJf "$flutter_archive" \
-        -C "$flutter_temp_dir/extracted"
-
-    if [[ ! -x "$flutter_temp_dir/extracted/flutter/bin/flutter" ]]; then
-        echo "Error: Flutter archive is invalid." >&2
-        exit 1
-    fi
-
-    if [[ ! -d "$flutter_install" ]]; then
-        mv "$flutter_temp_dir/extracted/flutter" "$flutter_install"
-    else
-        echo "Flutter $FLUTTER_VERSION is already installed."
-    fi
-
-    if [[ -e "$flutter_link" && ! -L "$flutter_link" ]]; then
-        local flutter_backup
-        flutter_backup="${flutter_link}.backup.$(date +%Y%m%d-%H%M%S)"
-
-        echo "Moving the existing Flutter installation to:"
-        echo "  $flutter_backup"
-
-        mv "$flutter_link" "$flutter_backup"
-    fi
-
-    ln -sfn "$flutter_install" "$flutter_link"
-
-    path_line='export PATH="$HOME/develop/flutter/bin:$PATH"'
-
-    touch "$HOME/.bashrc"
-
-    if ! grep -Fqx "$path_line" "$HOME/.bashrc"; then
-        {
-            printf '\n'
-            printf '# Flutter SDK\n'
-            printf '%s\n' "$path_line"
-        } >> "$HOME/.bashrc"
-    fi
-
-    export PATH="$HOME/develop/flutter/bin:$PATH"
-
-    log "Enabling Flutter targets"
-
-    flutter config \
-        --enable-android \
-        --enable-web \
-        --enable-linux-desktop
-
-    echo
-    flutter --version
-    dart --version
-)
-
 show_versions() {
     export PATH="$HOME/develop/flutter/bin:/usr/local/go/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
     export NVM_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/nvm"
@@ -563,29 +542,29 @@ show_versions() {
         source "$HOME/.sdkman/bin/sdkman-init.sh"
         set -u
 
-        sdk use java "$JAVA_VERSION" >/dev/null
+        sdk use java 17.0.20-tem >/dev/null
     fi
 
     log "Installed development tools"
 
-    printf '%-10s %s\n' "Go:"      "$(go version)"
-    printf '%-10s %s\n' "Rust:"    "$(rustc --version)"
-    printf '%-10s %s\n' "Cargo:"   "$(cargo --version)"
-    printf '%-10s %s\n' "Rustup:"  "$(rustup --version)"
-    printf '%-10s %s\n' "NVM:"     "$(nvm --version)"
-    printf '%-10s %s\n' "Node:"    "$(node --version)"
-    printf '%-10s %s\n' "npm:"     "$(npm --version)"
-    printf '%-10s %s\n' "pnpm:"    "$(pnpm --version)"
-    printf '%-10s %s\n' "Java:"    "$(java --version 2>&1 | sed -n '1p')"
-    printf '%-10s %s\n' "Javac:"   "$(javac --version 2>&1)"
+    printf '%-10s %s\n' "Go:"     "$(go version)"
+    printf '%-10s %s\n' "Rust:"   "$(rustc --version)"
+    printf '%-10s %s\n' "Cargo:"  "$(cargo --version)"
+    printf '%-10s %s\n' "Rustup:" "$(rustup --version)"
+    printf '%-10s %s\n' "NVM:"    "$(nvm --version)"
+    printf '%-10s %s\n' "Node:"   "$(node --version)"
+    printf '%-10s %s\n' "npm:"    "$(npm --version)"
+    printf '%-10s %s\n' "pnpm:"   "$(pnpm --version)"
+    printf '%-10s %s\n' "Java:"   "$(java --version 2>&1 | sed -n '1p')"
+    printf '%-10s %s\n' "Javac:"  "$(javac --version 2>&1)"
     printf '%-10s %s\n' "Flutter:" "$(flutter --version | sed -n '1p')"
     printf '%-10s %s\n' "Dart:"    "$(dart --version 2>&1)"
-    printf '%-10s %s\n' "uv:"      "$(uv --version)"
-    printf '%-10s %s\n' "Git:"     "$(git --version)"
-    printf '%-10s %s\n' "GitHub:"  "$(gh --version | sed -n '1p')"
-    printf '%-10s %s\n' "GCC:"     "$(gcc --version | sed -n '1p')"
-    printf '%-10s %s\n' "Clang:"   "$(clang --version | sed -n '1p')"
-    printf '%-10s %s\n' "CMake:"   "$(cmake --version | sed -n '1p')"
+    printf '%-10s %s\n' "uv:"     "$(uv --version)"
+    printf '%-10s %s\n' "Git:"    "$(git --version)"
+    printf '%-10s %s\n' "GitHub:" "$(gh --version | sed -n '1p')"
+    printf '%-10s %s\n' "GCC:"    "$(gcc --version | sed -n '1p')"
+    printf '%-10s %s\n' "Clang:"  "$(clang --version | sed -n '1p')"
+    printf '%-10s %s\n' "CMake:"  "$(cmake --version | sed -n '1p')"
 
     echo
     echo "WebKitGTK:"
@@ -597,13 +576,10 @@ show_versions() {
 }
 
 ask_to_reboot() {
-    local answer=""
+    local answer
 
     echo
-
-    if ! read -r -p "Reboot the computer now? [y/N] " answer; then
-        answer=""
-    fi
+    read -r -p "Reboot the computer now? [y/N] " answer
 
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         log "Rebooting"
@@ -624,7 +600,6 @@ main() {
 
     update_opensuse
 
-    # This explicitly checks for and replaces the minimal BusyBox utilities.
     replace_minimal_build_packages
 
     install_system_dev_packages
@@ -641,7 +616,6 @@ main() {
     export PATH="$HOME/.local/bin:$PATH"
 
     install_sdkman_and_java
-    load_sdkman_java
 
     install_android_studio
 
@@ -651,21 +625,11 @@ main() {
     show_versions
 
     echo
-    echo "Base system and development tools installed successfully."
+    echo "System update and development setup completed successfully."
     echo
-    echo "Android Studio still requires first-run Android SDK setup."
-    echo "After reboot:"
-    echo
-    echo "  1. Authenticate GitHub:"
-    echo "       gh auth login"
-    echo
-    echo "  2. Start Android Studio:"
-    echo "       android-studio"
-    echo
-    echo "  3. Install API 35, API 36, Build Tools 36.0.0,"
-    echo "     Platform Tools, Command-line Tools, Emulator, CMake and NDK."
-    echo
-    echo "  4. Configure ANDROID_HOME and accept Android licenses."
+    echo "GitHub authentication was not automated."
+    echo "After reboot, authenticate manually with:"
+    echo "  gh auth login"
     echo
 
     ask_to_reboot
