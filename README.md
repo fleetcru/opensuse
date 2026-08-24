@@ -67,6 +67,33 @@ sudo cloud-init status --long
 
 Root execution is intentional for cloud-init, but Flutter will warn that it is running as root and user-level files will be stored under `/root`.
 
+## Android Studio desktop entry
+
+The script installs Android Studio under `/opt/android-studio`. To add it to
+the KDE application menu, create this desktop entry:
+
+```bash
+sudo tee /usr/share/applications/android-studio.desktop >/dev/null <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Android Studio
+Comment=Android development environment
+Exec=/opt/android-studio/bin/studio.sh %f
+Icon=/opt/android-studio/bin/studio.png
+Terminal=false
+Categories=Development;IDE;
+StartupWMClass=jetbrains-android-studio
+EOF
+
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+```
+
+You can also launch it directly with:
+
+```bash
+/opt/android-studio/bin/studio.sh
+```
+
 ## Android Studio and Flutter
 
 The script installs Android Studio but does not complete the Android SDK wizard automatically.
