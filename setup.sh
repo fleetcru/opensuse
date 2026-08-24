@@ -258,6 +258,11 @@ install_firefox_mozilla() {
     log "Checking whether Mozilla provides the firefox package"
     if firefox_search_output="$(zypper_auto se --repo mozilla --match-exact firefox 2>&1)"; then
         if grep -Eq '(^|[[:space:]])firefox([[:space:]]|$)' <<< "$firefox_search_output"; then
+            if rpm -q MozillaFirefox >/dev/null 2>&1; then
+                log "Removing openSUSE's MozillaFirefox package"
+                zypper_auto remove MozillaFirefox
+            fi
+
             log "Installing Firefox explicitly from the Mozilla repository"
             zypper_auto install --from mozilla firefox
             return
