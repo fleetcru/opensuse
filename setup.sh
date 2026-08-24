@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Cloud-init may omit HOME for root; Git and Git LFS require it.
+export HOME="${HOME:-/root}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
 readonly GO_VERSION="go1.27.0"
 readonly NVM_INSTALL_RELEASE="v0.40.7"
 readonly NODE_VERSION="24"
