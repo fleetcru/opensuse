@@ -29,15 +29,21 @@ The script also installs the required Flutter Linux dependencies and stages the 
 
 ## Normal installation
 
-Download and run the latest version with cache refresh:
+Run the script as your regular sudo-enabled user. Do not prefix the script
+with `sudo`; it uses `sudo` internally for system-level changes so that
+user-level tools remain owned by your account.
+
+One-liner:
 
 ```bash
-curl -fsSL -H 'Cache-Control: no-cache' \
-  "https://suse.fleetcru.dev/setup.sh?refresh=$(date +%s)" \
-  -o /tmp/setup.sh && chmod +x /tmp/setup.sh && sudo /tmp/setup.sh
+curl -fsSL -H 'Cache-Control: no-cache' "https://suse.fleetcru.dev/setup.sh?refresh=$(date +%s)" -o /tmp/setup.sh && chmod +x /tmp/setup.sh && /tmp/setup.sh
 ```
 
-The script asks whether to reboot at the end. Rebooting is recommended.
+The script asks for your sudo password near the beginning and asks whether to
+reboot at the end. Rebooting is recommended.
+
+Do not run `sudo /tmp/setup.sh` on a personal machine. That makes root own
+user-level tools such as Flutter, Rust, Node, and SDKMAN.
 
 ## Cloud-init installation
 
