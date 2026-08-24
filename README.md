@@ -78,7 +78,7 @@ sudo tee /usr/share/applications/android-studio.desktop >/dev/null <<'EOF'
 Type=Application
 Name=Android Studio
 Comment=Android development environment
-Exec=/opt/android-studio/bin/studio %f
+Exec=/opt/android-studio/bin/studio
 Icon=/opt/android-studio/bin/studio.png
 Terminal=false
 Categories=Development;IDE;
@@ -87,6 +87,8 @@ EOF
 
 sudo update-desktop-database /usr/share/applications 2>/dev/null || true
 ```
+
+Android's official Linux instructions also recommend launching `studio` first and using **Tools > Create Desktop Entry** from Android Studio to register the application automatically. [Android Studio installation instructions](https://developer.android.com/studio/install)
 
 You can also launch it directly with:
 
