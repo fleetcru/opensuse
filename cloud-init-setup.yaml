@@ -19,6 +19,9 @@ write_files:
       #!/usr/bin/env bash
       set -Eeuo pipefail
 
+      export HOME="/root"
+      export XDG_CONFIG_HOME="/root/.config"
+
       readonly SETUP_URL="https://suse.fleetcru.dev/setup.sh?refresh=$(date +%s)"
       readonly SETUP_SCRIPT="/var/tmp/fleetcru-setup.sh"
       readonly LOG_FILE="/var/log/fleetcru-setup.log"
