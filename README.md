@@ -78,7 +78,7 @@ sudo tee /usr/share/applications/android-studio.desktop >/dev/null <<'EOF'
 Type=Application
 Name=Android Studio
 Comment=Android development environment
-Exec=/opt/android-studio/bin/studio.sh %f
+Exec=/opt/android-studio/bin/studio %f
 Icon=/opt/android-studio/bin/studio.png
 Terminal=false
 Categories=Development;IDE;
@@ -91,7 +91,7 @@ sudo update-desktop-database /usr/share/applications 2>/dev/null || true
 You can also launch it directly with:
 
 ```bash
-/opt/android-studio/bin/studio.sh
+/opt/android-studio/bin/studio
 ```
 
 ## Android Studio and Flutter
