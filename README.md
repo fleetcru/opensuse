@@ -85,7 +85,7 @@ Categories=Development;IDE;
 StartupWMClass=jetbrains-android-studio
 EOF
 
-update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+sudo update-desktop-database /usr/share/applications 2>/dev/null || true
 ```
 
 You can also launch it directly with:
